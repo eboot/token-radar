@@ -1,24 +1,37 @@
-/* Token Radar's plain theme. One palette, two radii, two typefaces and a
-   spacing scale carry the whole page; the rest is hairlines and type steps. */
+/* Token Radar, professional theme. An editorial finance look: a dark ink masthead,
+   warm paper canvas, white panels, hairline rules, a serif display face for the
+   headline and section titles, and tabular numerals for every figure. One accent
+   (deep emerald), one warning red, and a restrained gold reserved for the top
+   three ranks. Nothing here reaches the network: every face is a system stack. */
 :root {
-  --canvas: #f2f5f3;
+  --ink: #0e1512;
+  --ink-soft: #1b2620;
+  --ink-line: #2a3a32;
+  --canvas: #f4f3ee;
   --surface: #ffffff;
-  --ink: #16211c;
-  --muted: #5f6f67;
-  --border: #d8e2dc;
-  --accent: #0f7a5a;
+  --line: #dfe2d8;
+  --line-strong: #c9cfc2;
+  --muted: #5e6b60;
+  --faint: #8a978d;
+  --accent: #0a6b4e;
+  --accent-soft: #e2efe9;
+  --accent-ink: #0a6b4e;
+  --gold: #9a7414;
+  --gold-soft: #f7efdb;
   --negative: #b23b2e;
+  --negative-soft: #f7e8e5;
+  --radius-panel: 12px;
   --radius-control: 8px;
-  --radius-panel: 14px;
+  --font-display: Georgia, "Times New Roman", serif;
   --font-body: system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-num: ui-monospace, "SF Mono", Menlo, monospace;
-  --step-1: 4px;
-  --step-2: 8px;
-  --step-3: 12px;
-  --step-4: 16px;
-  --step-5: 24px;
-  --step-6: 32px;
-  --step-7: 48px;
+  --font-num: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+  --s7: 48px;
 }
 
 * {
@@ -31,30 +44,27 @@ body {
   margin: 0;
   background: var(--canvas);
   color: var(--ink);
-  font: 400 15px/1.5 var(--font-body);
+  font: 400 15px/1.55 var(--font-body);
   text-wrap: pretty;
+  -webkit-font-smoothing: antialiased;
 }
 h1,
 h2,
 h3 {
   margin: 0;
-  letter-spacing: -0.02em;
   text-wrap: balance;
 }
 h1 {
-  font-size: 30px;
-  line-height: 1.15;
-  font-weight: 600;
+  font: 600 34px/1.12 var(--font-display);
+  letter-spacing: -0.01em;
 }
 h2 {
-  font-size: 20px;
-  line-height: 1.2;
-  font-weight: 600;
+  font: 600 21px/1.25 var(--font-display);
+  letter-spacing: -0.01em;
 }
 h3 {
-  font-size: 16px;
-  line-height: 1.25;
-  font-weight: 600;
+  font: 600 16px/1.3 var(--font-body);
+  letter-spacing: -0.01em;
 }
 p {
   margin: 0;
@@ -75,95 +85,155 @@ a {
   position: absolute;
   left: -9999px;
   top: 0;
-  padding: var(--step-2) var(--step-4);
+  padding: var(--s2) var(--s4);
   background: var(--surface);
-  border: 1px solid var(--border);
-  z-index: 20;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  z-index: 30;
 }
 .skip:focus {
-  left: var(--step-4);
-  top: var(--step-4);
+  left: var(--s4);
+  top: var(--s4);
 }
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-/* Page frame: header, lede with facts, controls, then the board panel. */
+/* Page frame. */
 .shell {
-  max-width: 1320px;
+  max-width: 1360px;
   margin: 0 auto;
-  padding: var(--step-5) var(--step-6) var(--step-7);
+  padding: var(--s5) var(--s6) var(--s7);
 }
+
+/* Masthead: a dark ink band carrying the wordmark, a radar glyph and the
+   snapshot meta. It is the one dark element on the page, so it reads as the
+   product's identity rather than another panel. */
 .top {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: var(--step-5);
-  padding-bottom: var(--step-4);
-  border-bottom: 1px solid var(--border);
+  gap: var(--s5);
+  padding: var(--s4) var(--s5);
+  background: var(--ink);
+  color: #f2f4ef;
+  border-radius: var(--radius-panel);
 }
 .brand {
   display: flex;
   align-items: center;
-  gap: var(--step-3);
+  gap: var(--s3);
+  min-width: 0;
 }
 .mark {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--accent);
+  width: 30px;
+  height: 30px;
   flex: none;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, #7fd6b3 0 2px, transparent 3px),
+    radial-gradient(circle at 50% 50%, transparent 0 7px, rgba(127, 214, 179, 0.55) 8px, transparent 9px),
+    radial-gradient(circle at 50% 50%, transparent 0 12px, rgba(127, 214, 179, 0.35) 13px, transparent 14px);
+  border: 1px solid rgba(127, 214, 179, 0.5);
 }
 .brand-name {
-  font-family: var(--font-num);
-  font-size: 13px;
-  letter-spacing: 0.02em;
-  color: var(--muted);
+  font: 600 17px/1.2 var(--font-display);
+  letter-spacing: 0.01em;
+  color: #f2f4ef;
+  white-space: nowrap;
+}
+.brand-name em {
+  font-style: normal;
+  color: #7fd6b3;
 }
 .top-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--step-3);
+  gap: var(--s2) var(--s5);
   justify-content: flex-end;
-  color: var(--muted);
-  font-size: 13px;
+  color: #a9b8ad;
+  font-size: 12.5px;
 }
 .top-meta span {
   white-space: nowrap;
 }
+.top-meta b {
+  color: #f2f4ef;
+  font-weight: 600;
+}
+
+/* Lede: headline and standfirst on the left, the coverage facts on the right. */
 .lede {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
-  gap: var(--step-6);
-  padding: var(--step-6) 0 var(--step-5);
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.6fr);
+  gap: var(--s6);
+  padding: var(--s6) 0 var(--s5);
 }
 .lede p {
   color: var(--muted);
-  max-width: 62ch;
-  margin-top: var(--step-2);
+  max-width: 64ch;
+  margin-top: var(--s3);
+  font-size: 15.5px;
 }
 .facts {
   display: grid;
-  gap: var(--step-2);
+  gap: var(--s2);
   align-content: start;
-  border-left: 1px solid var(--border);
-  padding-left: var(--step-5);
+  border-left: 1px solid var(--line-strong);
+  padding-left: var(--s5);
 }
 .fact {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: var(--step-3);
+  gap: var(--s3);
+  padding: 2px 0;
 }
 .fact b {
   font-family: var(--font-num);
-  font-size: 15px;
-  font-weight: 500;
+  font-size: 14.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 .fact span {
   color: var(--muted);
   font-size: 13px;
+}
+
+/* Hero stats: four headline figures on one rule, the way a market page
+   opens. Each is a big tabular number with a small caps label above it. */
+.hero {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--s4);
+  padding: var(--s5) 0;
+  border-top: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line-strong);
+}
+.stat {
+  display: grid;
+  gap: var(--s1);
+  align-content: start;
+}
+.stat-label {
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.stat-value {
+  font-family: var(--font-num);
+  font-size: 26px;
+  line-height: 1.15;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.stat-sub {
+  color: var(--muted);
+  font-size: 12.5px;
 }
 
 /* Controls: search, category, tabs and the row count. */
@@ -171,45 +241,53 @@ a {
   display: flex;
   flex-wrap: wrap;
   align-items: end;
-  gap: var(--step-3);
-  padding: var(--step-4) 0;
-  border-top: 1px solid var(--border);
+  gap: var(--s3);
+  padding: var(--s5) 0 var(--s4);
 }
 .field {
   display: grid;
-  gap: var(--step-1);
+  gap: var(--s1);
 }
 .field label {
   color: var(--muted);
   font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 .field input,
 .field select {
-  min-height: 36px;
-  padding: 0 var(--step-3);
-  border: 1px solid var(--border);
+  min-height: 38px;
+  padding: 0 var(--s3);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius-control);
   background: var(--surface);
   min-width: 180px;
 }
 .field input {
-  min-width: 280px;
+  min-width: 300px;
+}
+.field input:focus,
+.field select:focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 .tabs {
   display: flex;
-  gap: var(--step-1);
+  gap: 2px;
   padding: 3px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius-control);
   background: var(--surface);
 }
 .tabs button {
-  min-height: 30px;
-  padding: 0 var(--step-3);
+  min-height: 32px;
+  padding: 0 var(--s4);
   border: 0;
   border-radius: 6px;
   background: transparent;
   color: var(--muted);
+  font-weight: 500;
 }
 .tabs button[aria-pressed="true"] {
   background: var(--ink);
@@ -220,14 +298,16 @@ a {
   color: var(--muted);
   font-size: 13px;
   align-self: center;
+  font-variant-numeric: tabular-nums;
 }
 
-/* The board table and its row pieces. */
+/* The board panel and its table. The header sticks while the board scrolls. */
 .panel {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: var(--radius-panel);
   overflow: hidden;
+  box-shadow: 0 1px 2px rgba(14, 21, 18, 0.05);
 }
 .table-wrap {
   overflow-x: auto;
@@ -239,26 +319,35 @@ table {
 }
 th,
 td {
-  padding: var(--step-3) var(--step-3);
-  border-bottom: 1px solid var(--border);
+  padding: var(--s3) var(--s3);
+  border-bottom: 1px solid var(--line);
   text-align: left;
   vertical-align: middle;
 }
-th {
+thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--surface);
   color: var(--muted);
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   white-space: nowrap;
+  border-bottom: 1px solid var(--line-strong);
 }
 th button {
   display: inline-flex;
   align-items: center;
-  gap: var(--step-1);
+  gap: var(--s1);
   border: 0;
   background: none;
   padding: 0;
   color: inherit;
   font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
 }
 th button:hover {
   color: var(--ink);
@@ -267,15 +356,39 @@ tbody tr {
   cursor: pointer;
 }
 tbody tr:hover {
-  background: var(--surface);
+  background: var(--accent-soft);
 }
 tbody tr[data-selected="true"] {
-  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+tbody tr:last-child td {
+  border-bottom: 0;
 }
 .num {
   font-family: var(--font-num);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+.rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  font-family: var(--font-num);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.rank.top {
+  background: var(--gold-soft);
+  border-color: #d9c48a;
+  color: var(--gold);
 }
 .name {
   display: grid;
@@ -287,26 +400,27 @@ tbody tr[data-selected="true"] {
 .name-row {
   display: flex;
   align-items: center;
-  gap: var(--step-2);
+  gap: var(--s2);
   flex-wrap: wrap;
 }
 .pill {
   font-size: 11px;
-  font-weight: 500;
-  padding: 1px 7px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 2px 8px;
   border-radius: 999px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--line-strong);
   color: var(--muted);
   white-space: nowrap;
 }
 .pill.watch {
-  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
-  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: #9dc8b4;
+  color: var(--accent-ink);
 }
 .sub {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 12.5px;
 }
 .pos {
   color: var(--accent);
@@ -315,49 +429,52 @@ tbody tr[data-selected="true"] {
   color: var(--negative);
 }
 .bar {
-  width: 120px;
+  width: 110px;
   height: 6px;
   border-radius: 3px;
-  background: color-mix(in srgb, var(--border) 60%, var(--surface));
+  background: #e7eae2;
   overflow: hidden;
+  flex: none;
 }
 .bar i {
   display: block;
   height: 100%;
   background: var(--accent);
+  border-radius: 3px;
 }
 .implied {
   display: flex;
   align-items: center;
-  gap: var(--step-2);
+  gap: var(--s3);
 }
 .status {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 12.5px;
   white-space: nowrap;
 }
 .status::before {
   content: "";
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: var(--accent);
+  flex: none;
 }
 
-/* Model sandbox sliders and the model note under the board. */
+/* Sandbox sliders and the model note under the board. */
 .sandbox {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: var(--step-4);
+  gap: var(--s4);
   align-items: end;
 }
 .slider-row {
   display: flex;
   align-items: center;
-  gap: var(--step-2);
+  gap: var(--s2);
 }
 .slider-row input[type="range"] {
   flex: 1;
@@ -367,14 +484,18 @@ tbody tr[data-selected="true"] {
 .slider-row output {
   font-family: var(--font-num);
   font-size: 13px;
-  min-width: 34px;
+  min-width: 36px;
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 .model {
-  margin-top: var(--step-4);
-  padding: var(--step-5);
+  margin-top: var(--s4);
+  padding: var(--s5);
   display: grid;
-  gap: var(--step-3);
+  gap: var(--s3);
+}
+.model h2 {
+  font-size: 19px;
 }
 .formula {
   font-family: var(--font-num);
@@ -382,28 +503,64 @@ tbody tr[data-selected="true"] {
   line-height: 1.7;
   color: var(--muted);
   overflow-wrap: anywhere;
+  background: var(--canvas);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  padding: var(--s3) var(--s4);
 }
 .empty {
-  padding: var(--step-7) var(--step-5);
+  padding: var(--s7) var(--s5);
   text-align: center;
   display: grid;
-  gap: var(--step-3);
+  gap: var(--s3);
   justify-items: center;
 }
 .empty p {
   color: var(--muted);
 }
 .button {
-  min-height: 36px;
-  padding: 0 var(--step-4);
-  border: 1px solid var(--border);
+  min-height: 38px;
+  padding: 0 var(--s4);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius-control);
   background: var(--surface);
+  font-weight: 500;
+}
+.button:hover {
+  border-color: var(--ink);
 }
 .button.primary {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--surface);
+}
+.button.primary:hover {
+  background: #084d39;
+  border-color: #084d39;
+}
+
+/* Site footer: methodology, source and the honest disclaimer. Plain text,
+   no links, so the page stays fully offline. */
+.site-foot {
+  margin-top: var(--s6);
+  padding-top: var(--s5);
+  border-top: 1px solid var(--line-strong);
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: var(--s5);
+}
+.site-foot h3 {
+  font-family: var(--font-display);
+  font-size: 15px;
+  margin-bottom: var(--s2);
+}
+.site-foot p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.site-foot p + p {
+  margin-top: var(--s2);
 }
 
 /* The detail drawer on the right, with its breakdown and farm steps. */
@@ -412,14 +569,13 @@ tbody tr[data-selected="true"] {
   top: 0;
   right: 0;
   bottom: 0;
-  width: min(520px, 92vw);
+  width: min(540px, 94vw);
   z-index: 10;
   background: var(--surface);
-  border-left: 1px solid var(--border);
-  padding: var(--step-5);
+  border-left: 1px solid var(--line-strong);
+  padding: var(--s5);
   overflow-y: auto;
-  transform: translateX(0);
-  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+  box-shadow: -12px 0 32px rgba(14, 21, 18, 0.14);
   margin: 0 0 0 auto;
   max-height: 100%;
 }
@@ -427,66 +583,90 @@ tbody tr[data-selected="true"] {
   display: none;
 }
 .detail::backdrop {
-  background: rgba(22, 33, 28, 0.28);
+  background: rgba(14, 21, 18, 0.32);
 }
 .detail-head {
   display: flex;
   align-items: start;
   justify-content: space-between;
-  gap: var(--step-4);
+  gap: var(--s4);
 }
 .detail-head > div {
   min-width: 0;
+}
+.detail-kicker {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 .detail-head .sub {
   overflow-wrap: anywhere;
 }
 .close {
   flex: none;
-  min-width: 32px;
-  min-height: 32px;
-  padding: 0 var(--step-2);
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0 var(--s2);
   white-space: nowrap;
-  border: 1px solid var(--border);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius-control);
   background: var(--surface);
+  font-weight: 500;
+}
+.close:hover {
+  border-color: var(--ink);
 }
 .detail h2 {
-  margin-top: var(--step-1);
+  margin-top: var(--s1);
+  font-size: 24px;
 }
 .detail .sub {
-  margin-top: var(--step-1);
+  margin-top: var(--s1);
 }
 .detail-section {
-  margin-top: var(--step-5);
-  padding-top: var(--step-4);
-  border-top: 1px solid var(--border);
+  margin-top: var(--s5);
+  padding-top: var(--s4);
+  border-top: 1px solid var(--line);
 }
 .detail-section h3 {
-  margin-bottom: var(--step-2);
+  margin-bottom: var(--s2);
 }
 .equation {
   display: grid;
-  gap: var(--step-2);
+  gap: var(--s2);
   font-family: var(--font-num);
   font-size: 13px;
 }
 .equation div {
   display: flex;
   justify-content: space-between;
-  gap: var(--step-3);
+  gap: var(--s3);
+  padding: 3px 0;
+  border-bottom: 1px dashed var(--line);
+}
+.equation div:last-child {
+  border-bottom: 0;
 }
 .equation span {
   color: var(--muted);
 }
+.equation b {
+  font-variant-numeric: tabular-nums;
+}
 .steps {
   margin: 0;
-  padding-left: var(--step-5);
+  padding-left: var(--s5);
   display: grid;
-  gap: var(--step-3);
+  gap: var(--s3);
 }
 .steps li {
-  padding-left: var(--step-1);
+  padding-left: var(--s1);
+}
+.steps li::marker {
+  color: var(--accent);
+  font-weight: 600;
 }
 .steps b {
   display: block;
@@ -498,24 +678,41 @@ tbody tr[data-selected="true"] {
   font-family: var(--font-num);
 }
 
-/* Narrow screens stack the lede; reduced motion kills the drawer slide. */
+/* Narrow screens stack the lede, the hero and the footer; reduced motion
+   kills the drawer slide. */
 @media (max-width: 900px) {
   .shell {
-    padding: var(--step-4);
+    padding: var(--s4);
+  }
+  .top {
+    flex-wrap: wrap;
+    padding: var(--s4);
+  }
+  .top-meta {
+    justify-content: flex-start;
   }
   .lede {
     grid-template-columns: 1fr;
-    gap: var(--step-4);
+    gap: var(--s4);
   }
   .facts {
     border-left: 0;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--line-strong);
     padding-left: 0;
-    padding-top: var(--step-4);
+    padding-top: var(--s4);
+  }
+  .hero {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .site-foot {
+    grid-template-columns: 1fr;
   }
   .field input {
     min-width: 0;
     width: 100%;
+  }
+  h1 {
+    font-size: 28px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

@@ -200,11 +200,61 @@
 
   function header() {
     return el('header', { class: 'top' },
-      el('div', { class: 'brand' }, el('span', { class: 'mark' }), el('span', { class: 'brand-name', text: 'Token Radar' })),
+      el('div', { class: 'brand' },
+        el('span', { class: 'mark', 'aria-hidden': 'true' }),
+        el('span', { class: 'brand-name', html: 'Token <em>Radar</em>' })
+      ),
       el('div', { class: 'top-meta' },
-        el('span', { text: 'Snapshot ' + DATA.as_of }),
-        el('span', { text: 'DefiLlama protocol index' }),
-        el('span', { text: DATA.model_version + ' model' })
+        el('span', { html: 'Snapshot <b>' + DATA.as_of + '</b>' }),
+        el('span', { html: 'Source <b>DefiLlama</b>' }),
+        el('span', { html: 'Model <b>' + DATA.model_version + '</b>' })
+      )
+    );
+  }
+
+  // The hero strip: four headline figures a market page opens with. Every
+  // number is computed from the snapshot figures in this page, never typed in.
+  function hero() {
+    var watch = DATA.rows.filter(function (r) { return r.watchlist; });
+    var watchTvl = watch.reduce(function (sum, r) { return sum + r.tvl_usd; }, 0);
+    var top = DATA.rows.reduce(function (best, r) { return r.implied_value_usd > best.implied_value_usd ? r : best; }, DATA.rows[0]);
+    return el('section', { class: 'hero', 'aria-label': 'Headline figures' },
+      el('div', { class: 'stat' },
+        el('span', { class: 'stat-label', text: 'Watchlist TVL' }),
+        el('span', { class: 'stat-value', text: fmtUsd(watchTvl) }),
+        el('span', { class: 'stat-sub', text: 'across ' + DATA.watchlist_size + ' watchlist protocols' })
+      ),
+      el('div', { class: 'stat' },
+        el('span', { class: 'stat-label', text: 'Highest implied value' }),
+        el('span', { class: 'stat-value', text: fmtUsd(top.implied_value_usd) }),
+        el('span', { class: 'stat-sub', text: '#1 ' + top.name })
+      ),
+      el('div', { class: 'stat' },
+        el('span', { class: 'stat-label', text: 'Protocols ranked' }),
+        el('span', { class: 'stat-value', text: String(DATA.board_size) }),
+        el('span', { class: 'stat-sub', text: DATA.watchlist_size + ' watchlist + ' + DATA.early_size + ' early' })
+      ),
+      el('div', { class: 'stat' },
+        el('span', { class: 'stat-label', text: 'Live tokens set aside' }),
+        el('span', { class: 'stat-value', text: String(DATA.live_size) }),
+        el('span', { class: 'stat-sub', text: 'their market caps price the categories' })
+      )
+    );
+  }
+
+  // The site footer: methodology, source and the honest disclaimer. Plain
+  // text only, so the page stays fully offline.
+  function siteFoot() {
+    return el('footer', { class: 'site-foot' },
+      el('div', null,
+        el('h3', { text: 'How the board is built' }),
+        el('p', { text: 'Every protocol in the DefiLlama index is read from a sealed snapshot taken ' + DATA.as_of + '. A protocol joins the watchlist when it holds at least $' + Math.round(DATA.floor_usd / 1e6) + 'M of TVL and records no token. Wrapped and staked products of a trading token are excluded. Implied value is TVL times a category multiple priced from that category\u2019s own live-token protocols, times a seven-day growth factor, times a maturity factor for how long the protocol has run with no token, times a small bonus for running on more than one chain.' }),
+        el('p', { text: 'The early radar is every pre-token protocol below the watchlist floor, by TVL. Protocols that already trade are set aside with their market caps shown, and their market caps are what price the categories.' })
+      ),
+      el('div', null,
+        el('h3', { text: 'Read it as a model' }),
+        el('p', { text: 'Implied value is an estimate of what a launch could be worth if the market priced this protocol the way it prices live protocols in the same category. It is not a price, a prediction or investment advice. Farm plans name real costs and times, but gas, slippage and eligibility change; verify every step on the protocol\u2019s own site before you act.' }),
+        el('p', { text: 'Source: DefiLlama protocol index, snapshot ' + DATA.as_of + '. Model ' + DATA.model_version + '. Built for the make.fun token-radar-01 bounty.' })
       )
     );
   }
@@ -274,7 +324,7 @@
         onclick: function () { openDetail(r.slug); },
         onkeydown: function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail(r.slug); } }
       },
-        el('td', { class: 'num', text: String(shownRank) }),
+        el('td', null, el('span', { class: shownRank <= 3 ? 'rank top' : 'rank', text: String(shownRank) })),
         el('td', null, el('div', { class: 'name' },
           el('div', { class: 'name-row' },
             el('b', { text: r.name }),
@@ -422,7 +472,7 @@
       : 'Priced by ' + cal.live_count + ' live-token ' + (row.category || 'Other') + ' protocol' + (cal.live_count === 1 ? '' : 's') + (cal.median_mcap_per_tvl === null ? '' : ', median ' + cal.median_mcap_per_tvl + ' market cap per dollar of TVL') + '.';
     dialog.appendChild(el('div', { class: 'detail-head' },
       el('div', null,
-        el('span', { class: 'brand-name', text: 'Rank ' + row.rank + ' of ' + DATA.board_size + (row.watchlist ? ' · watchlist' : ' · early radar') }),
+        el('span', { class: 'detail-kicker', text: 'Rank ' + row.rank + ' of ' + DATA.board_size + (row.watchlist ? ' · watchlist' : ' · early radar') }),
         el('h2', { id: 'detail-title', text: row.name }),
         el('p', { class: 'sub', text: (row.category || 'Other') + ' on ' + (row.chains && row.chains.length ? row.chains.join(', ') : 'an unnamed chain') })
       ),
@@ -464,6 +514,7 @@
     var shell = el('div', { class: 'shell' });
     shell.appendChild(header());
     shell.appendChild(lede());
+    shell.appendChild(hero());
     shell.appendChild(controls());
     shell.appendChild(state.tab === 'pre-token' ? boardTable() : liveTable());
     if (state.tab === 'pre-token') {
@@ -472,6 +523,7 @@
     } else {
       shell.appendChild(calibrationTable());
     }
+    shell.appendChild(siteFoot());
     app.appendChild(shell);
     app.setAttribute('aria-busy', 'false');
     if (!dialog.isConnected) app.appendChild(dialog);
