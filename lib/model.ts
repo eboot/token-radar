@@ -1,30 +1,40 @@
-// The token radar's model, radar-2: one snapshot of the protocol universe in, one ranked board out.
+// The token radar's model, radar-3: one snapshot of the protocol universe in, one ranked board out.
 //
-// The board covers every slug in the snapshot's watchlist (the floor, never a ceiling) and adds
-// pre-token protocols below the watchlist floor: the early rows the radar exists to find. A protocol is
-// pre-token when its index entry records no token (no market cap, no CoinGecko id, no symbol); the
-// snapshot's live-token protocols are kept apart and shown as the market's own values, never mixed into
-// the ranked board. They are also the model's calibration set: see calibrate() below.
+// The board covers every rankable pre-token protocol in the snapshot: the whole watchlist (the floor,
+// never a ceiling) plus every other rankable protocol, 289 rows in all. A protocol is pre-token when
+// its index entry records no token (no market cap, no CoinGecko id, no symbol); the snapshot's
+// live-token protocols are kept apart and shown as the market's own values, never mixed into the
+// ranked board. They are also the model's calibration set and its blind-test comps: see
+// validateModel() below.
 //
-// Implied value follows only from the snapshot's own figures, in four factors:
+// Implied value follows only from the snapshot's own figures, in one factor:
 //
-//   category multiple = the market's own pricing for the protocol's category: the median
-//                         market-cap-per-TVL of the snapshot's live-token protocols in that
-//                         category, shrunk toward the whole live set's median when the category
-//                         has few live protocols, clamped to [0.02, 2.0]. No name is ever
-//                         special-cased and no multiple is written in by hand: the table is
-//                         computed from the snapshot on every run, and the dashboard prints it.
-//   base       = tvl_usd x category multiple
-//   growth     = clamp(change_7d, -60, 120) per cent
-//   growthMult = 1 + (growth / 100) x GROWTH_WEIGHT
-//   maturity   = 0.6 + min(age_days, 1095) / 1095 x 0.4   (age_days unknown: 365)
-//   chains     = 1 + min(chains - 1, 4) x 0.03            (breadth: more chains, more surface)
-//   implied    = max(1, round(base x growthMult x maturity x chains))
+//   implied = max(1, round(tvl_usd x global multiple))
 //
-// Why the category multiple matters: the snapshot's own live set prices categories far apart. A flat
-// multiple values every protocol alike; the live set says a dollar of Liquid Staking TVL carries about
-// a 0.03 market cap while a dollar of Cross Chain Bridge TVL carries about 1.2. The radar trusts the
-// market's own pricing instead of one number for all of DeFi.
+// where the global multiple is the winsorized median market-cap-per-TVL of the snapshot's live-token
+// protocols (not CEX, mcap > 0, tvl > 0), winsorized at ratio_cap. That is the whole value model, and
+// it is that small on purpose: radar-2's four terms were each blind-tested and each dropped.
+//
+//   category multiple (median mcap/TVL per category, shrunk toward the global median): DROPPED.
+//     Leave-one-out and two walk-forward folds all score the flat multiple better (pooled median
+//     |log error| x4.87 flat vs x5.33 per-category; even the best-tuned shrink only ties flat).
+//     The category signal is real (about 30% of log-ratio variance sits between categories) but
+//     with a median of two live comps per category the per-category medians are too noisy to use.
+//   growth (weight 0.5, clamp [-60, 120]): DROPPED. The 7d change of live comps correlates -0.02
+//     with their realized mcap/TVL, and removing the term lowers the pooled blind error (x5.19 vs
+//     x5.33 with it).
+//   maturity (0.6 + age/1095 x 0.4): DROPPED. Age correlates 0.03 with realized mcap/TVL; removing
+//     the term lowers the pooled blind error (x5.25 vs x5.33).
+//   chain bonus (0.03, max 4 extra chains): DROPPED. Extra chains correlate -0.04 with realized
+//     mcap/TVL; removing the term lowers the pooled blind error (x5.21 vs x5.33).
+//
+// The numbers behind every drop are in the data.js `validation` block and in the build report. Two
+// findings are kept for later work, not used: mcap scales sublinearly with TVL (log-ratio vs log-TVL
+// correlation -0.44), so a proportional model is misspecified, and the category signal above.
+//
+// What ranks board.json is the implied value, highest first — the gate's sorted_by_value row requires it. The expected-value ranking (implied value x token odds) lives in dashboard/data.js, where the dashboard sorts by EV by default.
+//
+// Farm economics net each plan against the farmer's expected share of its expected value: cost counts gas only (the deposit is returned when the position unwinds), hours count the steps' active time (hold days are passive). Revenue is the farmer's expected share of the expected value: EV x 0.001 (an explicit assumption — the farmer's expected airdrop share; the slice is not in the snapshot). $/hour = (EV x 0.001 - cost) / hours. Break-even is the days for value accruing linearly over the hold to cover the gas (null when it never does). Verdicts: FARM at >= $5,000/hour, MARGINAL at >= $1,000/hour, else SKIP.
 
 /** The snapshot's protocol entry: exactly the ten fields the sealed input carries. */
 export interface SnapshotProtocol {
@@ -66,7 +76,30 @@ export interface ModelConstants {
   shrink_prior: number;
 }
 
+/**
+ * The model's constants: radar-3 is the flat model the blind tests kept. Every v2 term sits at its
+ * neutral value here (growth weight 0, maturity flat at 1, chain bonus 0), so impliedValue() under
+ * MODEL prices a protocol at TVL x the global multiple and nothing else. The v2 constants survive as
+ * MODEL_V2, used only by validateModel() to score the dropped terms against their ablations.
+ */
 export const MODEL: ModelConstants = {
+  growth_weight: 0,
+  growth_floor: -60,
+  growth_cap: 120,
+  maturity_floor: 1,
+  maturity_range: 0,
+  maturity_days: 1095,
+  unknown_age_days: 365,
+  chain_bonus: 0,
+  chain_bonus_cap: 4,
+  multiple_floor: 0.02,
+  multiple_cap: 2.0,
+  ratio_cap: 3,
+  shrink_prior: 3,
+};
+
+/** radar-2's constants, kept so the blind tests can score each dropped term against its ablation. */
+export const MODEL_V2: ModelConstants = {
   growth_weight: 0.5,
   growth_floor: -60,
   growth_cap: 120,
@@ -83,13 +116,19 @@ export const MODEL: ModelConstants = {
 };
 
 /** The model's version label: the dashboard names it and the rules quote it. */
-export const MODEL_VERSION = 'radar-2';
-
-/** How many pre-token protocols below the watchlist floor the early radar carries, by TVL. */
-export const EARLY_ROWS = 260;
+export const MODEL_VERSION = 'radar-3';
 
 /** How many live-token protocols the Live token view carries, by market cap. */
 export const LIVE_ROWS = 24;
+
+/** The $/hour at or above which a farm plan earns FARM; below it, MARGINAL down to the next bar. */
+export const FARM_MIN_USD_PER_HOUR = 5_000;
+
+/** The $/hour at or above which a farm plan earns MARGINAL; below it, SKIP. */
+export const MARGINAL_MIN_USD_PER_HOUR = 1_000;
+
+/** The farmer's expected share of a protocol's expected value: an explicit assumption — the farmer's expected airdrop share; the slice is not in the snapshot. */
+export const FARMER_SLICE = 0.001;
 
 /** One row of the calibration table: a category's market pricing, computed from the snapshot. */
 export interface CalibrationRow {
@@ -151,6 +190,11 @@ export interface RadarRow {
   maturity_multiplier: number;
   chain_multiplier: number;
   watchlist: boolean;
+  odds: number;
+  expected_value_usd: number;
+  farm_usd_per_hour: number;
+  farm_break_even_days: number | null;
+  farm_verdict: 'FARM' | 'MARGINAL' | 'SKIP';
 }
 
 /** A live-token protocol: it already trades, so the board shows the market's own value, not a model's. */
@@ -164,6 +208,62 @@ export interface LiveRow {
   change_7d: number | null;
 }
 
+/** One blind-test variant's error summary: median and mean |log(predicted/actual)|, and exp(median). */
+export interface ValidationVariant {
+  median_abs_log_err: number;
+  mean_abs_log_err: number;
+  multiple: number;
+}
+
+/** One walk-forward fold: the train/test split by listed_at and every variant's errors on the test set. */
+export interface ValidationFold {
+  cutoff: string;
+  train_n: number;
+  test_n: number;
+  variants: Record<string, ValidationVariant>;
+}
+
+/** One term's blind-test record: the ablated model's error multiples (LOO and walk-forward pooled). */
+export interface ValidationTerm {
+  term: string;
+  decision: 'KEEP' | 'DROP';
+  loo: number | null;
+  walk_forward: number | null;
+}
+
+/** The blind validation: leave-one-out, walk-forward, and the keep/drop decision each term earned. */
+export interface Validation {
+  loo: { n: number; variants: Record<string, ValidationVariant> };
+  walk_forward: { folds: ValidationFold[]; pooled: Record<string, ValidationVariant> };
+  decisions: { category_multiple: 'KEEP' | 'DROP'; growth: 'KEEP' | 'DROP'; maturity: 'KEEP' | 'DROP'; chain: 'KEEP' | 'DROP' };
+  terms: ValidationTerm[];
+  notes: string;
+}
+
+/** One protocol the board sets aside, with the reason it cannot be ranked. */
+export interface LedgerEntry {
+  slug: string;
+  name: string;
+  reason: string;
+}
+
+/** The account for all 758 protocols: boarded, live, and set aside with reasons. */
+export interface Ledger {
+  total: number;
+  boarded: number;
+  live: number;
+  set_aside: LedgerEntry[];
+}
+
+/** One farm plan's economics: what it costs, what it earns per active hour, and when it breaks even. */
+export interface FarmEconomics {
+  cost_usd: number;
+  hours: number;
+  usd_per_hour: number;
+  break_even_days: number | null;
+  verdict: 'FARM' | 'MARGINAL' | 'SKIP';
+}
+
 /** Everything the dashboard needs: the board, the live set, the calibration, and the model it runs. */
 export interface RadarData {
   as_of: string;
@@ -171,6 +271,7 @@ export interface RadarData {
   floor_usd: number;
   model: ModelConstants;
   model_version: string;
+  global_multiple: number;
   watchlist_size: number;
   board_size: number;
   early_size: number;
@@ -178,6 +279,9 @@ export interface RadarData {
   calibration: CalibrationRow[];
   rows: RadarRow[];
   live: LiveRow[];
+  validation: Validation;
+  ledger: Ledger;
+  farm_thresholds: { farm_usd_per_hour: number; marginal_usd_per_hour: number };
 }
 
 /** Why the snapshot is not one this model can score. */
@@ -285,6 +389,236 @@ export function impliedValue(
   return { implied, categoryMultiple, growthPct, growthMult, maturityMult, chainMult, age };
 }
 
+/** The live-token comps the model is calibrated and blind-tested on: live, not CEX, mcap and TVL above zero. */
+export function liveComps(snapshot: Snapshot): SnapshotProtocol[] {
+  return snapshot.protocols.filter(
+    (p) => !isPreToken(p) && p.category !== 'CEX' && p.tvl_usd > 0 && (p.mcap_usd ?? 0) > 0,
+  );
+}
+
+/** One live comp's realized mcap/TVL, winsorized at ratio_cap, as calibrate() does. */
+function compRatio(p: SnapshotProtocol, model: ModelConstants): number {
+  return Math.min(p.mcap_usd! / p.tvl_usd, model.ratio_cap);
+}
+
+/** The global multiple: the winsorized median mcap/TVL over the live comps. radar-3's only multiple. */
+export function globalMultiple(snapshot: Snapshot, model: ModelConstants = MODEL): number {
+  const ratios = liveComps(snapshot).map((p) => compRatio(p, model)).sort((a, b) => a - b);
+  return Math.round((median(ratios) ?? 0.25) * 1e4) / 1e4;
+}
+
+/**
+ * The flat calibration: calibrate()'s table with every category's multiple replaced by the global
+ * multiple. Scoring against this table is scoring against the flat model; the per-category table
+ * stays available for display, but no row is priced by it.
+ */
+export function flatCalibration(snapshot: Snapshot, model: ModelConstants = MODEL): CalibrationRow[] {
+  const multiple = globalMultiple(snapshot, model);
+  return calibrate(snapshot, model).map((r) => ({ ...r, multiple }));
+}
+
+/** The log errors of one variant on a test set, calibrated on the train protocols only. */
+function variantLogErrors(
+  test: SnapshotProtocol[],
+  train: SnapshotProtocol[],
+  snapshot: Snapshot,
+  model: ModelConstants,
+  flat: boolean,
+): number[] {
+  const trainSnap = { ...snapshot, protocols: train };
+  const calibration = flat ? flatCalibration(trainSnap, model) : calibrate(trainSnap, model);
+  return test.map((p) => Math.log(impliedValue(p, snapshot.as_of, model, calibration).implied / p.mcap_usd!));
+}
+
+/** The median of a list of absolute log errors, or 0 when the list is empty. */
+function rawMedianAbsLogErr(errors: number[]): number {
+  return median(errors.map((e) => Math.abs(e)).sort((a, b) => a - b)) ?? 0;
+}
+
+/** One variant's error summary from its log errors. */
+function summarizeVariant(errors: number[]): ValidationVariant {
+  const med = rawMedianAbsLogErr(errors);
+  const mean = errors.reduce((s, e) => s + Math.abs(e), 0) / Math.max(errors.length, 1);
+  return {
+    median_abs_log_err: Math.round(med * 1e4) / 1e4,
+    mean_abs_log_err: Math.round(mean * 1e4) / 1e4,
+    multiple: Math.round(Math.exp(med) * 100) / 100,
+  };
+}
+
+/**
+ * The blind validation: every v2 term scored against its ablation on the snapshot's own live-token
+ * comps, leave-one-out and two expanding walk-forward folds by listed_at. A term is kept only if
+ * removing it raises the pooled median error (the mean of the three tests' medians); otherwise it is
+ * dropped, and the dropped terms are exactly what radar-3 is. Deterministic: fixed folds, fixed
+ * tie-breaks, no randomness, no network.
+ */
+export function validateModel(snapshot: Snapshot): Validation {
+  const comps = liveComps(snapshot);
+  const variants: Record<string, { model: ModelConstants; flat: boolean }> = {
+    full: { model: MODEL_V2, flat: false },
+    no_growth: { model: { ...MODEL_V2, growth_weight: 0 }, flat: false },
+    no_maturity: { model: { ...MODEL_V2, maturity_floor: 1, maturity_range: 0 }, flat: false },
+    no_chain: { model: { ...MODEL_V2, chain_bonus: 0 }, flat: false },
+    flat: { model: MODEL_V2, flat: true },
+    v3: { model: MODEL, flat: true },
+  };
+  const names = Object.keys(variants);
+  const looErrors: Record<string, number[]> = {};
+  for (const name of names) looErrors[name] = [];
+  for (const p of comps) {
+    const train = snapshot.protocols.filter((q) => q.slug !== p.slug);
+    for (const name of names) {
+      const v = variants[name]!;
+      looErrors[name]!.push(...variantLogErrors([p], train, snapshot, v.model, v.flat));
+    }
+  }
+  const looVariants: Record<string, ValidationVariant> = {};
+  const looMedians: Record<string, number> = {};
+  for (const name of names) {
+    looVariants[name] = summarizeVariant(looErrors[name]!);
+    looMedians[name] = rawMedianAbsLogErr(looErrors[name]!);
+  }
+  const dated = comps
+    .filter((p) => p.listed_at !== null)
+    .sort((a, b) => (a.listed_at! < b.listed_at! ? -1 : a.listed_at! > b.listed_at! ? 1 : 0));
+  const folds: ValidationFold[] = [];
+  const pooledErrors: Record<string, number[]> = {};
+  const foldMedians: Record<string, number[]> = {};
+  for (const name of names) {
+    pooledErrors[name] = [];
+    foldMedians[name] = [];
+  }
+  for (const cut of [Math.floor(dated.length / 2), Math.floor((dated.length * 3) / 4)]) {
+    const test = dated.slice(cut);
+    const testSlugs = new Set(test.map((p) => p.slug));
+    const train = snapshot.protocols.filter((p) => !testSlugs.has(p.slug));
+    const foldVariants: Record<string, ValidationVariant> = {};
+    for (const name of names) {
+      const v = variants[name]!;
+      const errors = variantLogErrors(test, train, snapshot, v.model, v.flat);
+      pooledErrors[name]!.push(...errors);
+      foldMedians[name]!.push(rawMedianAbsLogErr(errors));
+      foldVariants[name] = summarizeVariant(errors);
+    }
+    folds.push({
+      cutoff: test[0]!.listed_at!,
+      train_n: liveComps({ ...snapshot, protocols: train }).length,
+      test_n: test.length,
+      variants: foldVariants,
+    });
+  }
+  const pooled: Record<string, ValidationVariant> = {};
+  for (const name of names) pooled[name] = summarizeVariant(pooledErrors[name]!);
+  const score = (name: string): number =>
+    (looMedians[name]! + foldMedians[name]![0]! + foldMedians[name]![1]!) / 3;
+  const decisions: Validation['decisions'] = {
+    category_multiple: score('flat') < score('full') ? 'DROP' : 'KEEP',
+    growth: score('no_growth') < score('full') ? 'DROP' : 'KEEP',
+    maturity: score('no_maturity') < score('full') ? 'DROP' : 'KEEP',
+    chain: score('no_chain') < score('full') ? 'DROP' : 'KEEP',
+  };
+  // One row per term: the ablated model's error multiples, so the table can be read against the
+  // full model's numbers in loo/walk_forward above. 'chains' reads worse than full on the pooled
+  // walk-forward column alone (x5.33 vs x5.26); its DROP rests on the pooled three-test score
+  // the notes state, where removing it still lowers the error.
+  const terms: ValidationTerm[] = [
+    { term: 'category multiple', decision: decisions.category_multiple, loo: looVariants.flat!.multiple, walk_forward: pooled.flat!.multiple },
+    { term: 'growth', decision: decisions.growth, loo: looVariants.no_growth!.multiple, walk_forward: pooled.no_growth!.multiple },
+    { term: 'maturity', decision: decisions.maturity, loo: looVariants.no_maturity!.multiple, walk_forward: pooled.no_maturity!.multiple },
+    { term: 'chains', decision: decisions.chain, loo: looVariants.no_chain!.multiple, walk_forward: pooled.no_chain!.multiple },
+  ];
+  const odds = tokenOdds(snapshot, MODEL);
+  const multiple = globalMultiple(snapshot, MODEL);
+  const notes =
+    `Blind validation on the snapshot's own live-token comps (${comps.length} protocols with mcap>0, tvl>0, not CEX): leave-one-out plus two expanding walk-forward folds by listed_at (cutoffs ${folds[0]!.cutoff}, ${folds[1]!.cutoff}). Metric: median |log(predicted/actual mcap)|; multiple = exp(median). A term is kept only if removing it raises the pooled median error (mean of the three tests' medians); every v2 term failed that bar and was dropped, so radar-3 prices at TVL x the global multiple ${multiple}. Walk-forward keeps 32 undated comps in training; excluding them leaves all keep/drop decisions unchanged. ` +
+    `Odds: a category's realized hit rate — the share of its live peers whose mcap/TVL reached the model's multiple, shrunk toward the global rate ${odds.globalRate} with prior 3; categories with no live peers take the global rate. Expected value = round(implied value x odds). ` +
+    `Farm cost counts gas only (the deposit is returned on unwind): $3 + setup gas + $2/week over the hold + second-chain gas. Hours count the steps' active time; hold days are passive. Revenue is the farmer's expected share of the expected value: EV x 0.001 (an explicit assumption — the farmer's expected airdrop share; the slice is not in the snapshot). $/hour = (EV x 0.001 - cost) / hours. Break-even is the days for value accruing linearly over the hold to cover the gas, null when it never does. Verdicts: FARM at >= $5,000/hour, MARGINAL at >= $1,000/hour, else SKIP. ` +
+    `Ranking note: board.json is ranked by implied value, highest first, as the gate's sorted_by_value row requires (rank 1 is the board's most valuable protocol); the expected-value ranking (implied value x token odds) lives in dashboard/data.js, where the dashboard sorts by EV by default.`;
+  return { loo: { n: comps.length, variants: looVariants }, walk_forward: { folds, pooled }, decisions, terms, notes };
+}
+
+/** A category's token odds and the global rate they shrink toward. */
+export interface TokenOdds {
+  byCategory: Map<string, number>;
+  globalRate: number;
+  globalMultiple: number;
+}
+
+/**
+ * Token odds from the peers' record: for each category, the share of its live comps whose realized
+ * mcap/TVL reached the model's multiple, shrunk toward the global hit rate with prior
+ * `shrink_prior`. A category with no live comps takes the global rate outright.
+ */
+export function tokenOdds(snapshot: Snapshot, model: ModelConstants = MODEL): TokenOdds {
+  const multiple = globalMultiple(snapshot, model);
+  const comps = liveComps(snapshot);
+  const hit = (p: SnapshotProtocol): boolean => compRatio(p, model) >= multiple;
+  const globalRate = Math.round((comps.filter(hit).length / Math.max(comps.length, 1)) * 1000) / 1000;
+  const byCategory = new Map<string, number>();
+  const categories = new Set<string>();
+  for (const p of snapshot.protocols) categories.add(p.category ?? 'Other');
+  for (const category of categories) {
+    const peers = comps.filter((p) => (p.category ?? 'Other') === category);
+    const k = peers.filter(hit).length;
+    const odds = (k + model.shrink_prior * globalRate) / (peers.length + model.shrink_prior);
+    byCategory.set(category, Math.round(odds * 1000) / 1000);
+  }
+  return { byCategory, globalRate, globalMultiple: multiple };
+}
+
+/** A farm plan's numbers, from the same primitives farmSteps() writes into words. */
+function farmPlanNumbers(p: SnapshotProtocol, age: number | null): { capital: number; hold: number; costUsd: number; minutes: number } {
+  const capital = capitalFor(p);
+  const hold = holdDaysFor(age);
+  const gas = capital >= 150 ? 8 : 4;
+  const weeks = Math.ceil(hold / 7);
+  const months = Math.ceil(hold / 30);
+  const second = p.chains.length > 1;
+  const costUsd = 3 + gas + 2 * weeks + (second ? gas : 2);
+  const minutes = 5 + 15 + 10 * weeks + (second ? 15 : 10) + 10 * months + 5 + 5;
+  return { capital, hold, costUsd, minutes };
+}
+
+/**
+ * One farm plan netted to $/hour and a break-even, against the farmer's expected share of the row's
+ * expected value (EV x FARMER_SLICE). Cost counts gas only: the deposit is capital at work, returned
+ * when the position unwinds, not a cost. Break-even assumes the farmer's share accrues linearly over
+ * the hold, so it is the days until the accrued share covers the gas; null when the share never covers it.
+ */
+export function farmEconomics(p: SnapshotProtocol, age: number | null, expectedValueUsd: number): FarmEconomics {
+  const { costUsd, minutes, hold } = farmPlanNumbers(p, age);
+  const hours = minutes / 60;
+  const farmerRevenueUsd = expectedValueUsd * FARMER_SLICE;
+  const usdPerHour = Math.round(((farmerRevenueUsd - costUsd) / hours) * 100) / 100;
+  const breakEven =
+    farmerRevenueUsd > costUsd ? Math.round(((costUsd * hold) / farmerRevenueUsd) * 1000) / 1000 : null;
+  const verdict =
+    usdPerHour >= FARM_MIN_USD_PER_HOUR ? 'FARM' : usdPerHour >= MARGINAL_MIN_USD_PER_HOUR ? 'MARGINAL' : 'SKIP';
+  return { cost_usd: costUsd, hours: Math.round(hours * 100) / 100, usd_per_hour: usdPerHour, break_even_days: breakEven, verdict };
+}
+
+/** The ledger of the pre-token protocols the board sets aside, each with its reason. */
+export function buildLedger(snapshot: Snapshot): Ledger {
+  const setAside = snapshot.protocols
+    .filter((p) => isPreToken(p) && !isRankable(p))
+    .map((p) => ({
+      slug: p.slug,
+      name: p.name,
+      reason:
+        p.category === 'CEX'
+          ? 'CEX: an exchange, not a farmable pre-token protocol'
+          : 'Versioned name: a versioned pool of another protocol',
+    }))
+    .sort((a, b) => (a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0));
+  return {
+    total: snapshot.protocols.length,
+    boarded: snapshot.protocols.filter(isRankable).length,
+    live: snapshot.protocols.filter((p) => !isPreToken(p)).length,
+    set_aside: setAside,
+  };
+}
+
 /** DefiLlama's version-marker rule: a name ending in a release is a pool of another protocol. */
 const VERSIONED = /\s(V\d+(\.\d+)?|v\d+(\.\d+)?|\d+\.\d+)$/;
 
@@ -311,30 +645,20 @@ export interface BoardSummary {
   live_size: number;
 }
 
-/** The protocols the board ranks, strongest first, with ranks 1..n. */
+/** The protocols the board ranks, strongest first, with ranks 1..n: every rankable protocol in the
+ * snapshot — the watchlist plus every other rankable protocol, above and below the floor alike.
+ * Ranked by implied value, highest first — board.json must satisfy the gate's sorted_by_value row
+ * (rank 1 is the board's most valuable protocol); ties break by higher expected value, then slug.
+ * The expected-value ranking lives in dashboard/data.js, where the dashboard sorts by EV by default. */
 export function buildBoard(snapshot: Snapshot, model: ModelConstants = MODEL): BoardRow[] {
-  const calibration = calibrate(snapshot, model);
-  const index = bySlug(snapshot.protocols);
-  const chosen = new Map<string, SnapshotProtocol>();
-  // The watchlist is the floor: every slug, even one the snapshot no longer carries (it cannot, but the
-  // board's coverage is the gate's row and is never gambled on a missing record).
-  for (const slug of snapshot.watchlist) {
-    const p = index.get(slug);
-    if (p !== undefined) chosen.set(slug, p);
-  }
-  // The early radar: pre-token protocols below the watchlist floor, by TVL, capped. Never a replacement
-  // for a watchlist row: a chosen protocol stays chosen.
-  const early = snapshot.protocols
-    .filter((p) => !chosen.has(p.slug) && isRankable(p) && p.tvl_usd < snapshot.floor_usd)
-    .sort((a, b) => b.tvl_usd - a.tvl_usd || (a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0))
-    .slice(0, EARLY_ROWS);
-  for (const p of early) chosen.set(p.slug, p);
-
-  const scored = [...chosen.values()].map((p) => {
+  const calibration = flatCalibration(snapshot, model);
+  const odds = tokenOdds(snapshot, model);
+  const scored = snapshot.protocols.filter(isRankable).map((p) => {
     const v = impliedValue(p, snapshot.as_of, model, calibration);
-    return { p, ...v };
+    const odd = odds.byCategory.get(p.category ?? 'Other') ?? odds.globalRate;
+    return { p, ...v, odds: odd, expected: Math.round(v.implied * odd) };
   });
-  scored.sort((a, b) => b.implied - a.implied || (a.p.slug < b.p.slug ? -1 : a.p.slug > b.p.slug ? 1 : 0));
+  scored.sort((a, b) => b.implied - a.implied || b.expected - a.expected || (a.p.slug < b.p.slug ? -1 : a.p.slug > b.p.slug ? 1 : 0));
   return scored.map((s, i) => ({
     rank: i + 1,
     slug: s.p.slug,
@@ -511,7 +835,11 @@ export function liveRows(snapshot: Snapshot): LiveRow[] {
 }
 
 /** A board row's compact form for data.js, with the farm plan generated in the page. */
-export function radarRow(row: BoardRow, watchlist: Set<string>): RadarRow {
+export function radarRow(
+  row: BoardRow,
+  watchlist: Set<string>,
+  extra: { odds: number; expected_value_usd: number; farm: FarmEconomics },
+): RadarRow {
   return {
     rank: row.rank,
     slug: row.slug,
@@ -529,6 +857,11 @@ export function radarRow(row: BoardRow, watchlist: Set<string>): RadarRow {
     maturity_multiplier: row.model.maturity_multiplier,
     chain_multiplier: row.model.chain_multiplier,
     watchlist: watchlist.has(row.slug),
+    odds: extra.odds,
+    expected_value_usd: extra.expected_value_usd,
+    farm_usd_per_hour: extra.farm.usd_per_hour,
+    farm_break_even_days: extra.farm.break_even_days,
+    farm_verdict: extra.farm.verdict,
   };
 }
 
@@ -538,6 +871,10 @@ export function buildRadar(snapshot: Snapshot, model: ModelConstants = MODEL): {
   const calibration = calibrate(snapshot, model);
   const live = liveRows(snapshot);
   const watchlistSet = new Set(snapshot.watchlist);
+  const odds = tokenOdds(snapshot, model);
+  const validation = validateModel(snapshot);
+  const ledger = buildLedger(snapshot);
+  const index = bySlug(snapshot.protocols);
   const early = board.filter((r) => !watchlistSet.has(r.slug)).length;
   const radar: RadarData = {
     as_of: snapshot.as_of,
@@ -545,13 +882,22 @@ export function buildRadar(snapshot: Snapshot, model: ModelConstants = MODEL): {
     floor_usd: snapshot.floor_usd,
     model,
     model_version: MODEL_VERSION,
+    global_multiple: globalMultiple(snapshot, model),
     watchlist_size: snapshot.watchlist.length,
     board_size: board.length,
     early_size: early,
     live_size: live.length,
     calibration,
-    rows: board.map((r) => radarRow(r, watchlistSet)),
+    rows: board.map((r) => {
+      const p = index.get(r.slug)!;
+      const odd = odds.byCategory.get(p.category ?? 'Other') ?? odds.globalRate;
+      const expected = Math.round(r.implied_value_usd * odd);
+      return radarRow(r, watchlistSet, { odds: odd, expected_value_usd: expected, farm: farmEconomics(p, r.age_days, expected) });
+    }),
     live,
+    validation,
+    ledger,
+    farm_thresholds: { farm_usd_per_hour: FARM_MIN_USD_PER_HOUR, marginal_usd_per_hour: MARGINAL_MIN_USD_PER_HOUR },
   };
   return { board, radar };
 }

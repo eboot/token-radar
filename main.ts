@@ -1,16 +1,27 @@
 // token-radar-01 entry, Node 22, standard library only.
 //
 // What it does, in order: read the sealed snapshot (from /input/snapshot.json
-// or --input), rank every pre-token protocol with the model in lib/model.ts,
+// or --input), rank every rankable pre-token protocol with the model in lib/model.ts,
 // write the ranked board to /output/board.json, copy this repo's dashboard/
 // and screenshots/ into /output, then write /output/dossier.json, the summary
 // the judge reads, with the vendored make.fun library.
 //
+// radar-3: board.json ranks by implied value, highest first, as the gate's sorted_by_value row
+// requires (rank 1 is the board's most valuable protocol); the expected-value ranking (implied
+// value x token odds from the peers' record) lives in dashboard/data.js, where the dashboard
+// sorts by EV by default. The value model is the flat global multiple the blind tests kept
+// after dropping every v2 term, each farm plan is netted to $/hour with a FARM / MARGINAL / SKIP
+// verdict, and data.js carries the validation numbers plus the ledger accounting for all 758 protocols.
+//
+// NOTE on the gate: board.json ranks by implied value, highest first, so the gate's
+// sorted_by_value row (implied_value_usd non-increasing with rank) holds; boardIssue() below
+// still refuses any board that breaks it — that is the tripwire working as designed. The
+// expected-value ranking is not lost: it lives in dashboard/data.js, where the dashboard sorts
+// by EV by default. See the build report for the gate quotes and the coordinator's decision.
+//
 // The dashboard is a static page with no framework and no network:
 // dashboard/index.html, dashboard/app.css and dashboard/app.js read
-// /output/data.js, which this program writes from the same board. The point
-// of this entry is the model: the implied value comes from each category's
-// own live-token multiples, not one flat rate. Keep the gate's shape and
+// /output/data.js, which this program writes from the same board. Keep the gate's shape and
 // the outputs byte-identical between runs.
 //
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
@@ -96,5 +107,8 @@ writeFileSync(
 
 process.stdout.write(
   `token radar: ${snap.protocols.length} protocols, ${snap.watchlist.length} on the watchlist, ${board.length} rows scored (${radar.early_size} early, ${radar.live_size} live set aside)\n` +
+    `token radar: model ${radar.model_version}, global multiple ${radar.global_multiple}, ` +
+    `blind tests LOO x${radar.validation.loo.variants.v3!.multiple} / walk-forward pooled x${radar.validation.walk_forward.pooled.v3!.multiple}, ` +
+    `ledger ${radar.ledger.boarded} boarded + ${radar.ledger.live} live + ${radar.ledger.set_aside.length} set aside = ${radar.ledger.total}\n` +
     `token radar: wrote ${join(outDir, 'board.json')}, ${join(outDir, 'data.js')}, ${join(outDir, 'dashboard')} (3 files), ${join(outDir, 'screenshots')} (${shots.length} images) and ${join(outDir, 'dossier.json')}\n`,
 );

@@ -1,8 +1,7 @@
-/* Token Radar, professional theme. An editorial finance look: a dark ink masthead,
-   warm paper canvas, white panels, hairline rules, a serif display face for the
-   headline and section titles, and tabular numerals for every figure. One accent
-   (deep emerald), one warning red, and a restrained gold reserved for the top
-   three ranks. Nothing here reaches the network: every face is a system stack. */
+/* Token Radar, professional theme. Editorial finance look: dark ink masthead,
+   warm paper canvas, white panels, hairline rules, serif display face, tabular
+   numerals. One accent (deep emerald), one warning red, gold for the top three
+   ranks. Nothing here reaches the network: every face is a system stack. */
 :root {
   --ink: #0e1512;
   --ink-soft: #1b2620;
@@ -108,8 +107,7 @@ a {
 }
 
 /* Masthead: a dark ink band carrying the wordmark, a radar glyph and the
-   snapshot meta. It is the one dark element on the page, so it reads as the
-   product's identity rather than another panel. */
+   snapshot meta. */
 .top {
   display: flex;
   align-items: center;
@@ -201,8 +199,8 @@ a {
   font-size: 13px;
 }
 
-/* Hero stats: four headline figures on one rule, the way a market page
-   opens. Each is a big tabular number with a small caps label above it. */
+/* Hero stats: four headline figures on one rule. Each is a big tabular number
+   with a small caps label above it. */
 .hero {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -678,8 +676,102 @@ tbody tr:last-child td {
   font-family: var(--font-num);
 }
 
-/* Narrow screens stack the lede, the hero and the footer; reduced motion
-   kills the drawer slide. */
+/* Integrity strip: eight recomputed figures under the masthead. A chip that
+   disagrees turns red and says so. */
+.strip {
+  margin-top: var(--s4);
+  padding: var(--s4) var(--s5);
+  background: var(--ink);
+  color: #f2f4ef;
+  border-radius: var(--radius-panel);
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--s4);
+}
+.strip-chip {
+  display: grid;
+  gap: 2px;
+  align-content: start;
+  min-width: 0;
+}
+.strip-label {
+  color: #a9b8ad;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.strip-value {
+  font-family: var(--font-num);
+  font-size: 22px;
+  line-height: 1.15;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.strip-sub {
+  color: #a9b8ad;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.strip-chip.bad .strip-value,
+.strip-chip.bad .strip-label {
+  color: #f2a196;
+}
+.strip-note {
+  grid-column: 1 / -1;
+  color: #a9b8ad;
+  font-size: 12.5px;
+  border-top: 1px solid var(--ink-line);
+  padding-top: var(--s3);
+}
+.strip-note.bad {
+  color: #f2a196;
+}
+.bad-text {
+  color: var(--negative);
+  font-weight: 600;
+}
+
+/* Farm verdict badges: one colour per verdict, in the board and the detail. */
+.verdict {
+  display: inline-block;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.verdict-farm {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  border: 1px solid #9dc8b4;
+}
+.verdict-marginal {
+  background: var(--gold-soft);
+  color: var(--gold);
+  border: 1px solid #d9c48a;
+}
+.verdict-skip {
+  background: var(--negative-soft);
+  color: var(--negative);
+  border: 1px solid #e3b8b2;
+}
+.farm-cell {
+  display: grid;
+  gap: 1px;
+}
+
+/* Ledger tab: the reconciliation blocks stack with one gap. */
+.ledger {
+  display: grid;
+  gap: var(--s4);
+}
+.ledger .model {
+  margin-top: 0;
+}
+
+/* Narrow screens stack the lede, the hero and the footer. */
 @media (max-width: 900px) {
   .shell {
     padding: var(--s4);
@@ -713,6 +805,29 @@ tbody tr:last-child td {
   }
   h1 {
     font-size: 28px;
+  }
+}
+@media (max-width: 700px) {
+  .strip {
+    grid-template-columns: repeat(2, 1fr);
+    padding: var(--s4);
+  }
+  .strip-value {
+    font-size: 19px;
+  }
+  /* On a phone the board keeps its core columns; 7d and age hide. */
+  th.opt,
+  td.opt {
+    display: none;
+  }
+  .bar {
+    width: 64px;
+  }
+  .controls {
+    gap: var(--s2);
+  }
+  .count {
+    margin-left: 0;
   }
 }
 @media (prefers-reduced-motion: reduce) {
